@@ -1,0 +1,173 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+  <title>chessboardjs Example #5000 - Only Allow Legal Moves</title>
+  <link rel="stylesheet" href="css/chessboard-1.0.0.min.css">
+  <link href="css/multi-select.css" media="screen" rel="stylesheet" type="text/css">
+</head>
+<body>
+<div id="status"></div>
+<div id="myBoard" style="width: 400px"></div>
+<div>
+</br>
+Choisi les ouvertures que tu souhaites jouer en les selectionnant dans la liste ci-dessous
+</br>
+</div>
+<select id='callbacks' multiple='multiple'>
+
+</select>
+
+<script type='text/javascript' src="js/jquery-3.4.1.min.js"></script>
+<script type='text/javascript' src='js/chessboard.js'></script>
+<script type='text/javascript' src="js/chess-0.10.2.js"></script>
+<script type="text/javascript" src="js/jquery.multi-select.js"></script>
+<script>
+var scenari = [
+	{
+		name: 'classical caro-kann',
+		pgn: '1.e4 c6 2.d4 d5 3.Nc3 dxe4 4.Nxe4 Bf5 5.Ng3 Bg6 6.h4 h6 7.Nf3 Nd7',
+		score: '32.3 44.4 23.4'
+	}
+]
+var currentScenarioId = -1
+var currentScenari = []
+var currentPos = 0
+var currentError = 0
+var playerColor = 'w'
+var board = null
+var game = new Chess()
+var $status = $('#status')
+
+function onDragStart (source, piece, position, orientation) {
+  // do not pick up pieces if the game is over
+  if (game.game_over()) return false
+
+  // only pick up pieces for the side to move
+  if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+      (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
+    return false
+  }
+}
+
+function onDrop (source, target) {
+  // see if the move is legal
+  var move = game.move({
+    from: source,
+    to: target,
+    promotion: 'q' // NOTE: always promote to a queen for example simplicity
+  }, { sloppy: true })
+
+  // illegal move
+  if (currentScenarioId === -1 || move === null || move.san !== currentScenari[currentScenarioId].pgn[currentPos]) {
+	game.undo()
+	currentError++
+	return 'snapback'
+  }
+
+  currentPos++
+  updateStatus()
+}
+
+function ShowScenario (name, score) {
+	$status.text("Tu joue actuellement l'ouverture " + name + " -- " + score)
+}
+
+function addScenario (name) {
+	for (var i = 0; i < scenari.length; ++i) {
+		if (scenari[i].name = name) {
+			s = []
+			t = scenari[i].pgn.split(' ')
+			for (var p = 0; p < t.length; ++p) {
+				if (t[p].includes('.'))
+					s.push(t[p].split('.')[1])
+				else
+					s.push(t[p])
+			}
+			currentScenarioId = 0
+			currentScenari.push({name: scenari[i].name, pgn: s, score: scenari[i].score})
+			currentPos = 0
+			ShowScenario(scenari[0].name, scenari[0].score)
+			game.reset()
+			board.start()
+			updateStatus ()
+			break;
+		}
+	}
+}
+
+function removeScenario (name) {
+	for (var i = 0; i < currentScenari.length; ++i)
+		if (currentScenari[i].name + "" == name) {
+			currentScenari.splice(i, 1)
+		}
+	if (currentScenari.length === 0) {
+		currentScenarioId = -1
+		$status.text("")
+	} else {
+		currentScenarioId = 0
+		ShowScenario(scenari[0].name, scenari[0].score)
+	}
+	currentPos = 0
+	currentError = 0
+	game.reset()
+	board.start()
+	updateStatus ()
+}
+
+function onSnapEnd () {
+  board.position(game.fen())
+}
+
+function updateStatus () {
+  var status = ''
+  console.log(game.turn())
+  if (currentScenarioId === -1)
+	return
+  
+  if (game.turn() !== playerColor) {
+	tmp = currentScenari[currentScenarioId].pgn[currentPos++]
+	game.move(tmp)
+  }
+  
+  if (currentPos === currentScenari[currentScenarioId].pgn.length) {
+	currentScenarioId++
+	if (currentScenari.length === currentScenarioId) {
+		//todo show results
+		currentScenarioId = 0
+	}
+	// todo show victory
+	ShowScenario(currentScenari[currentScenarioId].name, currentScenari[currentScenarioId].score)
+	game.reset()
+	board.start()
+	currentPos = 0
+  }
+}
+
+var config = {
+  draggable: true,
+  position: 'start',
+  onDragStart: onDragStart,
+  onDrop: onDrop,
+  onSnapEnd: onSnapEnd
+}
+board = Chessboard('myBoard', config)
+updateStatus()
+
+// <option value='elem_1'>elem 1</option>
+for (var i = 0; i < scenari.length; ++i) {
+	$('#callbacks').append("<option value='" + scenari[i].name + "'>" + scenari[i].name + "</option>")
+}
+$('#callbacks').multiSelect({
+  afterSelect: function(values){
+    addScenario(values);
+  },
+  afterDeselect: function(values){
+    removeScenario(values);
+  }
+});
+
+</script>
+</body>
+</html>
